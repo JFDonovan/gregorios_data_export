@@ -1,15 +1,21 @@
 import requests
 import csv
-from datetime import date
+from datetime import datetime
+from enum import Enum
 
-today = date.today()
-formatted_date = today.strftime("%Y-%m-%d")  # e.g., "2025-08-18"
+class RunType(Enum):
+    TEST = 0
+    FULL = 1
 
+COOKIE_HEADER = ""
+RUN_TYPE = RunType.TEST
+
+current_datetime = datetime.now()
+formatted_datetime = current_datetime.strftime("%Y-%m-%d_%H%M%S")
 
 # Specify the output CSV file name
-filename = f"customer_data_{formatted_date}.csv"
+filename = f"{'' if RUN_TYPE == RunType.FULL else 'test_'}customer_data_{formatted_datetime}.csv"
 
-COOKIE_HEADER = "JSESSIONID=9EB1EB51FB74CD179E337EEAFDDF1E43; XSRF-TOKEN=EN77-ZS88-UVK9-HH1S-6GYB-MWMT-CMNX-4DRL"
 headers = {
         "Accept": "application/json, text/plain, */*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -85,7 +91,12 @@ def retrieve_customer_coupons(customer_id):
 
     if data_response.status_code == 200:
         data = data_response.json()
-        return data['result']
+        coupon_list = data['result']
+        new_coupon_list = []
+        for coupon in coupon_list:
+            if coupon['status'] != 'Expired' and coupon['status'] != 'Redeemed':
+                new_coupon_list.append(coupon)
+        return new_coupon_list
     else:
         print(f"Data fetch failed: {data_response.text}")
 
@@ -93,8 +104,8 @@ def retrieve_customer_coupons(customer_id):
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     output_data = [["Customer ID", "Name", "Email", "Phone Number", "Birthday", "Points", "Coupon List"]]
-    page_size_val = 1000
-    for i in range(0, 15000, page_size_val):
+    page_size_val = 1000 if RUN_TYPE == RunType.FULL else 25
+    for i in range(0, 15000 if RUN_TYPE == RunType.FULL else 25, page_size_val):
         customer_list = retrieve_customer_list(i, page_size_val)
         for customer in customer_list:
             customer_id = customer['Customer']['value']
@@ -102,7 +113,7 @@ if __name__ == '__main__':
             customer_points = retrieve_customer_points(customer_id)
             customer_coupon_data_list = retrieve_customer_coupons(customer_id)
             if customer_details is None:
-                output_data.append([customer_id, '', '', '', '', customer_points])
+                output_data.append([customer_id, '', '', '', '', customer_points, customer_coupon_data_list])
             else:
                 output_data.append([
                     customer_id,
